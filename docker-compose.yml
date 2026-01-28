@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: airflow_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: airflow_db
+      TZ: "America/Merida"  # Zona horaria
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - /etc/localtime:/etc/localtime:ro  # Sincroniza hora
+      - /etc/timezone:/etc/timezone:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  airflow-webserver:
+    image: apache/airflow:2.9.1-python3.9
+    container_name: airflow-webserver
+    depends_on:
+      - postgres
+      - airflow-scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://postgres:postgres@postgres:5432/airflow_db"
+      AIRFLOW__CORE__FERNET_KEY: "Y54PTqM8Svc4KPLCririFePqfWVx6oHPYhWZv1UxxM0="  # Debe coincidir en todos
+      AIRFLOW__WEBSERVER__SECRET_KEY: "a3d8e7f2d45c8b901e2d4f6c8a1b0e3d7f5a2c8b9e4d5f6a1b0c8d9e2f4a5"  # Clave segura
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+      TZ: "America/Merida"  # Zona horaria
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /etc/localtime:/etc/localtime:ro  # Sincroniza hora
+      - /etc/timezone:/etc/timezone:ro
+    ports:
+      - "8080:8080"
+    command: airflow webserver
+    restart: unless-stopped
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.1-python3.9
+    container_name: airflow-scheduler
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://postgres:postgres@postgres:5432/airflow_db"
+      AIRFLOW__CORE__FERNET_KEY: "Y54PTqM8Svc4KPLCririFePqfWVx6oHPYhWZv1UxxM0="
+      AIRFLOW__WEBSERVER__SECRET_KEY: "a3d8e7f2d45c8b901e2d4f6c8a1b0e3d7f5a2c8b9e4d5f6a1b0c8d9e2f4a5"  # Misma clave que webserver
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+      TZ: "America/Merida"  # Zona horaria
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /etc/localtime:/etc/localtime:ro  # Sincroniza hora
+      - /etc/timezone:/etc/timezone:ro
+    command: airflow scheduler
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
